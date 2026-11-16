@@ -1,4 +1,4 @@
-# BioVision AR reference architecture
+# BioVision reference architecture
 
 This repository is a typed, hardware-agnostic core for a React Native bare app and a Next.js 14 provider portal.
 
@@ -36,7 +36,7 @@ export SMTP_PORT=587
 export SMTP_SECURE=false
 export SMTP_USER=...
 export SMTP_PASSWORD=...
-export SMTP_FROM='BioVision AR <no-reply@example.com>'
+export SMTP_FROM='BioVision <no-reply@example.com>'
 npm start
 ```
 
