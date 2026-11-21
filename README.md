@@ -42,6 +42,20 @@ npm start
 
 If SMTP is not configured, account creation fails explicitly with an email-delivery error; the server does not display or log verification codes.
 
+## Vercel deployment
+
+Deploy this repository through Vercel. In **Project Settings > Environment Variables**, add these variables for Production and Preview:
+
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=587`
+- `SMTP_SECURE=false`
+- `SMTP_USER=bindhia28@gmail.com`
+- `SMTP_PASSWORD=<your Gmail App Password>`
+- `SMTP_FROM=BioVision <bindhia28@gmail.com>`
+- `SUPPORT_TO=bindhia28@gmail.com`
+
+Redeploy after changing environment variables. Then open `/health` to confirm the deployment and `/api/email-status` to confirm that email credentials are available. `/api/email-status` does not expose the password.
+
 ## Account and sharing flows
 
 Consumer registration collects a birthday, height, weight, phone number, goals, and optional health notes. Signed-in users can update these details at `/account`, and the progress-sharing and hospital-interest forms use the configured SMTP account for delivery. Hospital partnership requests are available at `/hospital-interest`.

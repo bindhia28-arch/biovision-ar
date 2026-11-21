@@ -3,6 +3,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import nodemailer from "nodemailer";
+import { fileURLToPath } from "node:url";
 
 const port = Number(process.env.PORT ?? 4173);
 const now = () => new Date().toISOString();
@@ -25,7 +26,14 @@ const userStates = new Map();
 const siteMessages = [];
 const userStorePath = join(process.cwd(), ".biovision-users.json");
 const stateStorePath = join(process.cwd(), ".biovision-state.json");
-const savedStates = existsSync(stateStorePath) ? JSON.parse(readFileSync(stateStorePath, "utf8")) : {};
+let savedStates = {};
+if (existsSync(stateStorePath)) {
+  try {
+    savedStates = JSON.parse(readFileSync(stateStorePath, "utf8"));
+  } catch (error) {
+    console.error("Could not load local workspace state:", error.message);
+  }
+}
 if (existsSync(userStorePath)) {
   try {
     for (const user of JSON.parse(readFileSync(userStorePath, "utf8"))) users.set(user.email, user);
@@ -110,13 +118,21 @@ function hashPassword(password, salt = randomBytes(16).toString("hex")) {
 }
 
 function persistUsers() {
-  writeFileSync(userStorePath, JSON.stringify([...users.values()], null, 2), { mode: 0o600 });
+  try {
+    writeFileSync(userStorePath, JSON.stringify([...users.values()], null, 2), { mode: 0o600 });
+  } catch (error) {
+    console.error("Could not persist local users:", error.message);
+  }
 }
 
 function persistState(user) {
   const states = Object.fromEntries([...userStates.entries()]);
   states[user.id] = userStates.get(user.id);
-  writeFileSync(stateStorePath, JSON.stringify(states, null, 2), { mode: 0o600 });
+  try {
+    writeFileSync(stateStorePath, JSON.stringify(states, null, 2), { mode: 0o600 });
+  } catch (error) {
+    console.error("Could not persist local workspace state:", error.message);
+  }
 }
 
 function verifyPassword(password, stored) {
@@ -362,7 +378,7 @@ $('report').onclick=()=>window.print();get();
 </script></body></html>`;
 }
 
-const server = createServer(async (request, response) => {
+export async function handleRequest(request, response) {
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
   if (request.method === "GET" && url.pathname === "/login") {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -431,7 +447,21 @@ const server = createServer(async (request, response) => {
     return;
   }
   if (request.method === "GET" && url.pathname === "/health") {
-    json(response, 200, { status: "ok", service: "biovision-ar-local" });
+    json(response, 200, {
+      status: "ok",
+      service: "biovision",
+      emailConfigured: smtpConfigured,
+      deployment: process.env.VERCEL === "1" ? "vercel" : "local"
+    });
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/email-status") {
+    json(response, 200, {
+      configured: smtpConfigured,
+      host: smtpConfigured ? process.env.SMTP_HOST : null,
+      from: smtpConfigured ? process.env.SMTP_FROM : null,
+      recipient: smtpConfigured ? (process.env.SUPPORT_TO || process.env.SMTP_USER) : null
+    });
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/state") {
@@ -808,6 +838,12 @@ const server = createServer(async (request, response) => {
     }
   }
   json(response, 404, { error: "Not found" });
-});
+}
 
-server.listen(port, "127.0.0.1", () => console.log(`BioVision local app: http://127.0.0.1:${port}`));
+export default handleRequest;
+
+const isDirectExecution = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isDirectExecution) {
+  const server = createServer(handleRequest);
+  server.listen(port, "127.0.0.1", () => console.log(`BioVision local app: http://127.0.0.1:${port}`));
+}
